@@ -500,8 +500,15 @@ async function runPythonScraper(scriptName) {
 async function fetchNBCRate() {
     try {
         // NBC publishes daily rate on their website and via data.mef.gov.kh API
+        // On Vercel, we skip SSL verification due to CA certificate issues
+        const isVercel = process.env.VERCEL === '1' || process.env.VERCEL_ENV !== undefined;
         const response = await __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$axios$2f$lib$2f$axios$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["default"].get('https://data.mef.gov.kh/api/v1/public-datasets/pd_66a0cd503e0bd300012638fb4/json?page=1&size=1', {
-            timeout: 10000
+            timeout: 10000,
+            ...isVercel && {
+                httpsAgent: new (__turbopack_context__.r("[externals]/https [external] (https, cjs)")).Agent({
+                    rejectUnauthorized: false
+                })
+            }
         });
         const data = response.data.data?.[0];
         if (data) {
@@ -562,6 +569,48 @@ async function fetchNBCRate() {
     };
 }
 async function fetchABARates(useProxy = false) {
+    // Check if running on Vercel - Selenium won't work there
+    const isVercel = process.env.VERCEL === '1' || process.env.VERCEL_ENV !== undefined;
+    if (isVercel) {
+        console.log('Running on Vercel - using demo data for ABA (Selenium not available)');
+        return {
+            bankName: 'ABA Bank',
+            bankCode: 'ABA',
+            updatedAt: new Date().toISOString(),
+            rates: [
+                {
+                    currency: 'USD',
+                    buyRate: 4000,
+                    sellRate: 4015,
+                    unit: 'KHR'
+                },
+                {
+                    currency: 'EUR',
+                    buyRate: 4320,
+                    sellRate: 4460,
+                    unit: 'KHR'
+                },
+                {
+                    currency: 'THB',
+                    buyRate: 118.50,
+                    sellRate: 122.80,
+                    unit: 'KHR'
+                },
+                {
+                    currency: 'CNY',
+                    buyRate: 548,
+                    sellRate: 565,
+                    unit: 'KHR'
+                },
+                {
+                    currency: 'GBP',
+                    buyRate: 5180,
+                    sellRate: 5350,
+                    unit: 'KHR'
+                }
+            ]
+        };
+    }
     // Try Python scraper first (uses curl_cffi or cloudscraper)
     console.log('Trying Python scraper for ABA...');
     const pythonResult = await runPythonScraper('scrape_aba.py');
@@ -1166,35 +1215,41 @@ module.exports = mod;
 __turbopack_context__.s([
     "GET",
     ()=>GET,
-    "dynamic",
-    ()=>dynamic,
-    "revalidate",
-    ()=>revalidate
+    "maxDuration",
+    ()=>maxDuration
 ]);
 var __TURBOPACK__imported__module__$5b$project$5d2f$lib$2f$scrapers$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/lib/scrapers.ts [app-route] (ecmascript)");
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$server$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/server.js [app-route] (ecmascript)");
 ;
 ;
-const dynamic = 'force-static';
-const revalidate = 300; // Revalidate every 5 minutes
+const maxDuration = 30; // Allow up to 30 seconds for scraping (Vercel hobby limit)
 async function GET(request) {
     try {
         const { searchParams } = new URL(request.url);
         const useProxy = searchParams.get('proxy') === 'true';
-        const useDemo = ("TURBOPACK compile-time value", "development") === 'production' && process.env.USE_DEMO_DATA === 'true';
+        // In production on Vercel, Selenium won't work - use demo fallback
+        const isVercel = process.env.VERCEL === '1' || process.env.VERCEL_ENV !== undefined;
+        const useDemo = isVercel || process.env.USE_DEMO_DATA === 'true';
+        console.log('API request:', {
+            isVercel,
+            useDemo,
+            useProxy,
+            env: process.env.VERCEL_ENV
+        });
         const rates = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$lib$2f$scrapers$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["fetchAllRates"])(useDemo, useProxy);
         return __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$server$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["NextResponse"].json({
             success: true,
             timestamp: new Date().toISOString(),
             data: rates,
             demoMode: useDemo,
-            proxyMode: useProxy
+            proxyMode: useProxy,
+            environment: isVercel ? 'vercel' : 'local'
         });
     } catch (error) {
         console.error('API error:', error);
         return __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$server$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["NextResponse"].json({
             success: false,
-            error: 'Failed to fetch exchange rates',
+            error: error instanceof Error ? error.message : 'Failed to fetch exchange rates',
             timestamp: new Date().toISOString()
         }, {
             status: 500
