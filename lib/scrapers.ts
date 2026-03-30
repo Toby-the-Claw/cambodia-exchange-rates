@@ -1,5 +1,6 @@
 import axios from 'axios';
 import * as cheerio from 'cheerio';
+import { fetchWithProxy, fetchWithScrapingBee, fetchWithScrapingAnt, defaultProxyConfig } from './proxy';
 
 export interface ExchangeRate {
   currency: string;
@@ -82,17 +83,48 @@ export async function fetchNBCRate(): Promise<BankRates> {
   };
 }
 
-// ABA Bank Scraper
-export async function fetchABARates(): Promise<BankRates> {
+// ABA Bank Scraper with Proxy Fallback
+export async function fetchABARates(useProxy = false): Promise<BankRates> {
+  const url = 'https://www.ababank.com/en/forex-exchange/';
+  
   try {
-    const response = await axios.get('https://www.ababank.com/en/forex-exchange/', {
-      timeout: 15000,
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-      },
-    });
+    let html: string;
     
-    const $ = cheerio.load(response.data);
+    if (useProxy && process.env.SCRAPINGBEE_API_KEY) {
+      // Use ScrapingBee for cloudflare-protected sites
+      console.log('Fetching ABA via ScrapingBee...');
+      html = await fetchWithScrapingBee(url);
+    } else if (useProxy && process.env.SCRAPINGANT_API_KEY) {
+      // Use ScrapingAnt as alternative
+      console.log('Fetching ABA via ScrapingAnt...');
+      html = await fetchWithScrapingAnt(url);
+    } else {
+      // Try direct fetch first
+      try {
+        const response = await axios.get(url, {
+          timeout: 15000,
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          },
+        });
+        html = response.data;
+      } catch (error) {
+        // If direct fails and we have proxy enabled, try with proxy
+        if (defaultProxyConfig.retryWithProxy) {
+          console.log('Direct ABA fetch failed, trying with proxy...');
+          const result = await fetchWithProxy(url, {
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            },
+          });
+          html = result.data;
+        } else {
+          throw error;
+        }
+      }
+    }
+    
+    const $ = cheerio.load(html);
     const rates: ExchangeRate[] = [];
     
     // Extract SWIFT Transfer rates from the first table
@@ -221,21 +253,51 @@ export async function fetchACLEDARates(): Promise<BankRates> {
   }
 }
 
-// Wing Bank Scraper
-export async function fetchWingRates(): Promise<BankRates> {
+// Wing Bank Scraper with Proxy Fallback
+export async function fetchWingRates(useProxy = false): Promise<BankRates> {
+  const url = 'https://www.wingbank.com.kh/en/exchange-rate';
+  
   try {
-    const response = await axios.get('https://www.wingbank.com.kh/en/exchange-rate', {
-      timeout: 15000,
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.9',
-        'Accept-Encoding': 'gzip, deflate, br',
-      },
-      maxRedirects: 10,
-    });
+    let html: string;
     
-    const $ = cheerio.load(response.data);
+    if (useProxy && process.env.SCRAPINGBEE_API_KEY) {
+      console.log('Fetching Wing via ScrapingBee...');
+      html = await fetchWithScrapingBee(url);
+    } else if (useProxy && process.env.SCRAPINGANT_API_KEY) {
+      console.log('Fetching Wing via ScrapingAnt...');
+      html = await fetchWithScrapingAnt(url);
+    } else {
+      try {
+        const response = await axios.get(url, {
+          timeout: 15000,
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Accept-Encoding': 'gzip, deflate, br',
+          },
+          maxRedirects: 10,
+        });
+        html = response.data;
+      } catch (error) {
+        // Try with proxy if direct fails
+        if (defaultProxyConfig.retryWithProxy) {
+          console.log('Direct Wing fetch failed, trying with proxy...');
+          const result = await fetchWithProxy(url, {
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+              'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+              'Accept-Language': 'en-US,en;q=0.9',
+            },
+          });
+          html = result.data;
+        } else {
+          throw error;
+        }
+      }
+    }
+    
+    const $ = cheerio.load(html);
     const rates: ExchangeRate[] = [];
     
     // Try multiple selectors
@@ -450,8 +512,8 @@ const demoRates: Record<string, ExchangeRate[]> = {
   ],
 };
 
-// Fetch all rates with demo fallback
-export async function fetchAllRates(useDemo = false): Promise<BankRates[]> {
+// Fetch all rates with demo fallback and optional proxy
+export async function fetchAllRates(useDemo = false, useProxy = false): Promise<BankRates[]> {
   if (useDemo) {
     return [
       {
@@ -489,9 +551,9 @@ export async function fetchAllRates(useDemo = false): Promise<BankRates[]> {
 
   const results = await Promise.allSettled([
     fetchNBCRate(),
-    fetchABARates(),
+    fetchABARates(useProxy),
     fetchACLEDARates(),
-    fetchWingRates(),
+    fetchWingRates(useProxy),
     fetchCanadiaRates(),
   ]);
   
