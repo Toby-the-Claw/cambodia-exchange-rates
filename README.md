@@ -1,36 +1,103 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Cambodia Exchange Rates Aggregator
+
+A web application that aggregates exchange rates from major Cambodian banks, providing real-time comparison of buy/sell rates.
+
+## Features
+
+- **Real-time Exchange Rates** - Fetches latest rates from major Cambodian banks
+- **USD/KHR Comparison** - Compare rates across all banks to find the best deal
+- **Multi-currency Support** - View rates for USD, EUR, THB, CNY, and more
+- **Bank Coverage**:
+  - National Bank of Cambodia (Official Rate)
+  - ABA Bank
+  - ACLEDA Bank
+  - Wing Bank
+  - Canadia Bank
+
+## Tech Stack
+
+- Next.js 16 (App Router)
+- TypeScript
+- Tailwind CSS
+- shadcn/ui
+- Cheerio (Web Scraping)
+- Axios
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
+
+- Node.js 18+
+- npm
+
+### Installation
 
 ```bash
+# Clone the repository
+cd cambodia-exchange-rates
+
+# Install dependencies
+npm install
+
+# Run development server
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Build for Production
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm run build
+```
 
-## Learn More
+The static export will be in the `dist` folder.
 
-To learn more about Next.js, take a look at the following resources:
+## Data Sources
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Rates are scraped from official bank websites:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+| Bank | Source URL |
+|------|------------|
+| National Bank of Cambodia | https://data.mef.gov.kh |
+| ABA Bank | https://www.ababank.com/en/forex-exchange/ |
+| ACLEDA Bank | https://www.acledabank.com.kh |
+| Wing Bank | https://www.wingbank.com.kh |
+| Canadia Bank | https://www.canadiabank.com.kh |
 
-## Deploy on Vercel
+## API Endpoints
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### GET /api/rates
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Returns exchange rates from all supported banks.
+
+**Response:**
+```json
+{
+  "success": true,
+  "timestamp": "2026-03-30T10:00:00Z",
+  "data": [
+    {
+      "bankName": "ABA Bank",
+      "bankCode": "ABA",
+      "updatedAt": "2026-03-30T09:45:00Z",
+      "rates": [
+        {
+          "currency": "USD",
+          "buyRate": 4000,
+          "sellRate": 4015,
+          "unit": "KHR"
+        }
+      ]
+    }
+  ]
+}
+```
+
+## Disclaimer
+
+This application is for informational purposes only. Exchange rates shown are indicative and may not reflect the actual rate at the time of transaction. Always confirm rates directly with your bank before making currency exchanges.
+
+## License
+
+MIT License
