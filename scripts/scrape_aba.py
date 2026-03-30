@@ -1,114 +1,113 @@
 #!/usr/bin/env python3
 """
-ABA Bank Exchange Rates Scraper
-Uses curl_cffi to mimic browser TLS fingerprint (bypasses Cloudflare)
-No external API required
+ABA Bank Exchange Rates Scraper using Selenium
+Uses real Chrome browser to bypass Cloudflare protection
 """
 
 import json
 import re
 import sys
 from datetime import datetime
-from typing import Dict, List
+from typing import Dict
 
-# Try curl_cffi (best for bypassing Cloudflare)
-try:
-    from curl_cffi import requests
-    CURL_CFFI_AVAILABLE = True
-except ImportError:
-    CURL_CFFI_AVAILABLE = False
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from bs4 import BeautifulSoup
 
 
-def scrape_aba_curl_cffi() -> Dict:
+def scrape_aba_selenium() -> Dict:
     """
-    Scrape ABA using curl_cffi (impersonates browser TLS/JA3 fingerprint)
-    This bypasses Cloudflare without external APIs
+    Scrape ABA Bank using Selenium with headless Chrome
+    This uses a real browser to bypass Cloudflare
     """
-    if not CURL_CFFI_AVAILABLE:
-        print("❌ curl_cffi not available")
-        return None
-        
     url = 'https://www.ababank.com/en/forex-exchange/'
     
-    print("Using curl_cffi (impersonates Chrome browser)...")
+    print("Setting up Selenium WebDriver...")
+    
+    # Configure Chrome options
+    chrome_options = Options()
+    chrome_options.add_argument('--headless')  # Run in background
+    chrome_options.add_argument('--no-sandbox')
+    chrome_options.add_argument('--disable-dev-shm-usage')
+    chrome_options.add_argument('--disable-gpu')
+    chrome_options.add_argument('--disable-blink-features=AutomationControlled')
+    chrome_options.add_argument('--window-size=1920,1080')
+    
+    # Set realistic user agent
+    chrome_options.add_argument('--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
+    
+    # Disable automation flags
+    chrome_options.add_experimental_option('excludeSwitches', ['enable-automation'])
+    chrome_options.add_experimental_option('useAutomationExtension', False)
     
     try:
-        # Use impersonate to mimic real Chrome browser
-        response = requests.get(
-            url,
-            impersonate="chrome120",
-            timeout=30
-        )
+        # Initialize driver
+        driver = webdriver.Chrome(options=chrome_options)
         
-        print(f"Status: {response.status_code}")
+        # Execute script to hide webdriver property
+        driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
         
-        if response.status_code == 200:
-            # Check if we got actual content or challenge page
-            if len(response.text) > 10000 and 'USD' in response.text:
-                print("✓ Successfully fetched page content")
-                return parse_aba_html(response.text)
-            else:
-                print("⚠️  Got challenge page or insufficient content")
-                return None
+        print(f"Navigating to {url}...")
+        driver.get(url)
+        
+        # Wait for page to load (look for table or specific content)
+        print("Waiting for page content...")
+        wait = WebDriverWait(driver, 30)
+        
+        try:
+            # Wait for either the table or the upload date text
+            wait.until(lambda d: 
+                'USD' in d.page_source or 
+                'Upload Date' in d.page_source or
+                'cloudflare' in d.page_source.lower()
+            )
+        except:
+            print("Timeout waiting for content")
+        
+        # Check if we hit Cloudflare challenge
+        if 'cloudflare' in driver.page_source.lower() and 'challenge' in driver.page_source.lower():
+            print("⚠️  Hit Cloudflare challenge page, waiting longer...")
+            # Wait additional time for challenge to complete
+            import time
+            time.sleep(10)
+        
+        # Get page source
+        html = driver.page_source
+        print(f"Page loaded: {len(html)} bytes")
+        
+        # Check if we got the actual page
+        if 'USD' in html and 'KHR' in html:
+            print("✓ Successfully loaded exchange rate page")
+            result = parse_aba_html(html)
         else:
-            print(f"❌ HTTP {response.status_code}")
-            return None
-            
-    except Exception as e:
-        print(f"❌ Error: {e}")
-        return None
-
-
-def scrape_aba_cloudscraper() -> Dict:
-    """Fallback to cloudscraper"""
-    try:
-        import cloudscraper
+            print("⚠️  Page may not contain expected content")
+            result = {'bankName': 'ABA Bank', 'bankCode': 'ABA', 'rates': []}
         
-        url = 'https://www.ababank.com/en/forex-exchange/'
-        
-        print("Using cloudscraper...")
-        
-        scraper = cloudscraper.create_scraper(
-            browser={
-                'browser': 'chrome',
-                'platform': 'windows',
-                'desktop': True
-            },
-            delay=10
-        )
-        
-        headers = {
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-            'Accept-Language': 'en-US,en;q=0.9',
-        }
-        
-        response = scraper.get(url, headers=headers, timeout=30)
-        
-        print(f"Status: {response.status_code}")
-        
-        if response.status_code == 200 and 'USD' in response.text:
-            return parse_aba_html(response.text)
-        return None
+        driver.quit()
+        return result
         
     except Exception as e:
-        print(f"Cloudscraper error: {e}")
-        return None
+        print(f"❌ Selenium error: {e}")
+        return {'bankName': 'ABA Bank', 'bankCode': 'ABA', 'rates': []}
 
 
 def parse_aba_html(html: str) -> Dict:
     """Parse ABA Bank HTML to extract exchange rates"""
-    from bs4 import BeautifulSoup
-    
     soup = BeautifulSoup(html, 'html.parser')
     rates = []
     
     # Find all tables
     tables = soup.find_all('table')
+    print(f"Found {len(tables)} tables")
     
     for table in tables:
         rows = table.find_all('tr')
         for i, row in enumerate(rows):
-            if i == 0:
+            if i == 0:  # Skip header
                 continue
                 
             cols = row.find_all(['td', 'th'])
@@ -158,33 +157,12 @@ def parse_aba_html(html: str) -> Dict:
 def main():
     """Main entry point"""
     print("=" * 60)
-    print("ABA Bank Exchange Rate Scraper")
-    print("No external API required")
+    print("ABA Bank Exchange Rate Scraper (Selenium)")
+    print("Uses headless Chrome browser")
     print("=" * 60)
     print()
     
-    # Try curl_cffi first (best option)
-    result = None
-    
-    if CURL_CFFI_AVAILABLE:
-        result = scrape_aba_curl_cffi()
-    else:
-        print("curl_cffi not installed. Install with:")
-        print("  pip3 install curl_cffi")
-        print()
-    
-    # Fallback to cloudscraper
-    if not result or not result.get('rates'):
-        result = scrape_aba_cloudscraper()
-    
-    # If all failed, return empty
-    if not result:
-        result = {
-            'bankName': 'ABA Bank',
-            'bankCode': 'ABA',
-            'updatedAt': datetime.now().isoformat(),
-            'rates': []
-        }
+    result = scrape_aba_selenium()
     
     # Display results
     print()
@@ -199,12 +177,6 @@ def main():
             print(f"  {rate['currency']}/{rate['unit']:<3}  Buy: {rate['buyRate']:<10}  Sell: {rate['sellRate']}")
     else:
         print("  No rates found")
-        print()
-        print("Note: ABA Bank has strong anti-bot protection.")
-        print("Recommendations:")
-        print("  1. Install curl_cffi: pip3 install curl_cffi")
-        print("  2. Use a residential proxy")
-        print("  3. Use ScrapingAnt/ScrapingBee API")
     
     # Save to JSON
     output_file = 'aba_rates.json'
