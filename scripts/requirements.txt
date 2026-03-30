@@ -1,0 +1,13 @@
+# Python dependencies for Cambodia Exchange Rates scraper
+
+# Web scraping
+requests>=2.31.0
+beautifulsoup4>=4.12.0
+cloudscraper>=1.2.71
+
+# Browser automation (optional)
+playwright>=1.40.0
+
+# Utilities
+lxml>=4.9.0
+html5lib>=1.1

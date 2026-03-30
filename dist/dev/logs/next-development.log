@@ -1,0 +1,13 @@
+{"timestamp":"00:00:01.247","source":"Server","level":"LOG","message":""}
+{"timestamp":"00:00:01.247","source":"Server","level":"LOG","message":"  We detected TypeScript in your project and reconfigured your tsconfig.json file for you."}
+{"timestamp":"00:00:01.248","source":"Server","level":"LOG","message":"  The following suggested values were added to your tsconfig.json. These values can be changed to fit your project's needs:\n"}
+{"timestamp":"00:00:01.248","source":"Server","level":"LOG","message":"  \t- include was updated to add 'dist/types/**/*.ts'"}
+{"timestamp":"00:00:01.249","source":"Server","level":"LOG","message":"  \t- include was updated to add 'dist/dev/types/**/*.ts'"}
+{"timestamp":"00:00:01.249","source":"Server","level":"LOG","message":""}
+{"timestamp":"00:00:01.466","source":"Server","level":"LOG","message":""}
+{"timestamp":"00:00:30.815","source":"Server","level":"LOG","message":"○ Compiling /api/rates ..."}
+{"timestamp":"00:00:32.662","source":"Server","level":"ERROR","message":"NBC fetch error: Error: unable to get local issuer certificate"}
+{"timestamp":"00:00:32.724","source":"Server","level":"LOG","message":"Direct ABA fetch failed, trying with proxy..."}
+{"timestamp":"00:00:32.930","source":"Server","level":"ERROR","message":"ABA fetch error: AxiosError: Request failed with status code 403"}
+{"timestamp":"00:00:36.319","source":"Server","level":"LOG","message":"Direct Wing fetch failed, trying with proxy..."}
+{"timestamp":"00:00:39.302","source":"Server","level":"ERROR","message":"Wing fetch error: \"Maximum number of redirects exceeded\""}

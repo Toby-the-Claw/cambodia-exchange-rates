@@ -1,6 +1,8 @@
 import axios from 'axios';
 import * as cheerio from 'cheerio';
 import { fetchWithProxy, fetchWithScrapingBee, fetchWithScrapingAnt, defaultProxyConfig } from './proxy';
+import { spawn } from 'child_process';
+import path from 'path';
 
 export interface ExchangeRate {
   currency: string;
@@ -14,6 +16,68 @@ export interface BankRates {
   bankCode: string;
   updatedAt: string;
   rates: ExchangeRate[];
+}
+
+// Run Python scraper script
+async function runPythonScraper(scriptName: string, envVars?: Record<string, string>): Promise<BankRates | null> {
+  return new Promise((resolve) => {
+    const scriptPath = path.join(process.cwd(), 'scripts', scriptName);
+    const pythonCmd = process.platform === 'win32' ? 'python' : 'python3';
+    
+    const env = {
+      ...process.env,
+      ...envVars,
+    };
+    
+    const child = spawn(pythonCmd, [scriptPath], {
+      env,
+      timeout: 60000,
+    });
+    
+    let output = '';
+    let errorOutput = '';
+    
+    child.stdout.on('data', (data) => {
+      output += data.toString();
+    });
+    
+    child.stderr.on('data', (data) => {
+      errorOutput += data.toString();
+      console.log(`Python: ${data.toString().trim()}`);
+    });
+    
+    child.on('close', (code) => {
+      if (code !== 0) {
+        console.error(`Python scraper exited with code ${code}`);
+        console.error(errorOutput);
+        resolve(null);
+        return;
+      }
+      
+      try {
+        // Find JSON output file
+        const resultPath = path.join(process.cwd(), 'scripts', 'aba_rates.json');
+        const fs = require('fs');
+        
+        if (fs.existsSync(resultPath)) {
+          const result = JSON.parse(fs.readFileSync(resultPath, 'utf-8'));
+          // Clean up temp file
+          fs.unlinkSync(resultPath);
+          resolve(result);
+        } else {
+          resolve(null);
+        }
+      } catch (error) {
+        console.error('Error parsing Python scraper output:', error);
+        resolve(null);
+      }
+    });
+    
+    child.on('error', (error) => {
+      console.error('Failed to start Python scraper:', error);
+      resolve(null);
+    });
+  });
 }
 
 // National Bank of Cambodia Official Rate
@@ -83,8 +147,19 @@ export async function fetchNBCRate(): Promise<BankRates> {
   };
 }
 
-// ABA Bank Scraper with Proxy Fallback
+// ABA Bank Scraper with Proxy/Python Fallback
 export async function fetchABARates(useProxy = false): Promise<BankRates> {
+  // Try Python scraper first if proxy mode is enabled
+  if (useProxy) {
+    console.log('Trying Python scraper for ABA...');
+    const pythonResult = await runPythonScraper('scrape_aba_proxy.py');
+    if (pythonResult && pythonResult.rates.length > 0) {
+      console.log('✓ Python scraper succeeded');
+      return pythonResult;
+    }
+    console.log('Python scraper failed, falling back to TypeScript...');
+  }
+  
   const url = 'https://www.ababank.com/en/forex-exchange/';
   
   try {
