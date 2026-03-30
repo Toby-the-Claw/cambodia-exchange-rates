@@ -309,51 +309,58 @@ export async function fetchCanadiaRates(): Promise<BankRates> {
     'Connection': 'keep-alive',
   };
 
-  // Try multiple possible endpoints
-  const urls = [
-    'https://digital.canadiabank.com/cnbtool/exchange/',
-    'https://www.canadiabank.com.kh/exchange-rates',
-    'https://www.canadiabank.com.kh/api/exchange-rates',
-  ];
-
-  for (const url of urls) {
-    try {
-      const response = await axios.get(url, {
-        timeout: 10000,
-        headers,
-        maxRedirects: 5,
-      });
+  try {
+    const response = await axios.get('https://www.canadiabank.com.kh/exchange-rates', {
+      timeout: 15000,
+      headers,
+      maxRedirects: 5,
+    });
+    
+    const $ = cheerio.load(response.data);
+    const rates: ExchangeRate[] = [];
+    
+    // Canadia has tables inside list items
+    // Structure: list > listitem > table > tr > td (Currency, Cash Buy, Cash Sell, TT Buy, TT Sell)
+    $('list listitem table, ul li table, [class*="list"] table').each((_, table) => {
+      const row = $(table).find('tr').first();
+      const cells = $(row).find('td');
       
-      const $ = cheerio.load(response.data);
-      const rates: ExchangeRate[] = [];
-      
-      // Try multiple selectors for rate tables
-      const selectors = [
-        'table.exchange-rate-table',
-        'table.rates-table',
-        '.exchange-rate table',
-        '.rates table',
-        'table',
-      ];
-      
-      for (const selector of selectors) {
-        $(selector).each((_, table) => {
-          $(table).find('tr').each((i, row) => {
-            if (i === 0) return;
-            const cols = $(row).find('td');
-            if (cols.length >= 3) {
-              const pairText = $(cols[0]).text().trim();
-              const buyText = $(cols[1]).text().trim().replace(/,/g, '');
-              const sellText = $(cols[2]).text().trim().replace(/,/g, '');
-              
-              let base = 'USD';
-              let quote = 'KHR';
-              
-              const match = pairText.match(/([A-Z]{3})[\/\s]*([A-Z]{3})/);
-              if (match) {
-                [, base, quote] = match;
-              }
-              
+      if (cells.length >= 3) {
+        const pairText = $(cells[0]).text().trim();
+        // For KHR pairs, use Telegraphic Transfer rates (index 3 and 4)
+        // For other pairs, use Cash rates (index 1 and 2) or TT if available
+        const isKHR = pairText.includes('KHR');
+        
+        const buyText = $(cells[isKHR && cells.length >= 4 ? 3 : 1]).text().trim().replace(/,/g, '');
+        const sellText = $(cells[isKHR && cells.length >= 5 ? 4 : 2]).text().trim().replace(/,/g, '');
+        
+        const match = pairText.match(/([A-Z]{3})\/([A-Z]{3})/);
+        if (match) {
+          const [, base, quote] = match;
+          const buyRate = parseFloat(buyText);
+          const sellRate = parseFloat(sellText);
+          
+          if (!isNaN(buyRate) && !isNaN(sellRate) && buyRate > 0 && sellRate > 0) {
+            rates.push({ currency: base, buyRate, sellRate, unit: quote });
+          }
+        }
+      }
+    });
+    
+    // Also try the header table structure
+    if (rates.length === 0) {
+      $('table').each((_, table) => {
+        $(table).find('tr').each((i, row) => {
+          if (i === 0) return; // Skip header
+          const cells = $(row).find('td');
+          if (cells.length >= 3) {
+            const pairText = $(cells[0]).text().trim();
+            const buyText = $(cells[cells.length >= 4 ? 3 : 1]).text().trim().replace(/,/g, '');
+            const sellText = $(cells[cells.length >= 5 ? 4 : 2]).text().trim().replace(/,/g, '');
+            
+            const match = pairText.match(/([A-Z]{3})\/([A-Z]{3})/);
+            if (match) {
+              const [, base, quote] = match;
               const buyRate = parseFloat(buyText);
               const sellRate = parseFloat(sellText);
               
@@ -361,24 +368,32 @@ export async function fetchCanadiaRates(): Promise<BankRates> {
                 rates.push({ currency: base, buyRate, sellRate, unit: quote });
               }
             }
-          });
+          }
         });
-        
-        if (rates.length > 0) break;
-      }
-      
-      if (rates.length > 0) {
-        return {
-          bankName: 'Canadia Bank',
-          bankCode: 'CANAD',
-          updatedAt: new Date().toISOString(),
-          rates,
-        };
-      }
-    } catch (error) {
-      console.log(`Canadia fetch from ${url} failed:`, (error as Error).message);
-      continue;
+      });
     }
+    
+    // Extract update time
+    let updatedAt = new Date().toISOString();
+    const timeText = $('p:contains("Last updated"), [class*="update"], [class*="date"]').text();
+    const dateMatch = timeText.match(/Last updated[:\s]*([^\n]+)/i);
+    if (dateMatch) {
+      const parsed = new Date(dateMatch[1].trim());
+      if (!isNaN(parsed.getTime())) {
+        updatedAt = parsed.toISOString();
+      }
+    }
+    
+    if (rates.length > 0) {
+      return {
+        bankName: 'Canadia Bank',
+        bankCode: 'CANAD',
+        updatedAt,
+        rates,
+      };
+    }
+  } catch (error) {
+    console.log('Canadia fetch error:', (error as Error).message);
   }
   
   // Fallback: return empty but valid response
@@ -415,9 +430,23 @@ const demoRates: Record<string, ExchangeRate[]> = {
     { currency: 'THB', buyRate: 118.80, sellRate: 123.20, unit: 'KHR' },
   ],
   'CANAD': [
-    { currency: 'USD', buyRate: 3998, sellRate: 4010, unit: 'KHR' },
-    { currency: 'EUR', buyRate: 4300, sellRate: 4440, unit: 'KHR' },
-    { currency: 'THB', buyRate: 118.20, sellRate: 122.50, unit: 'KHR' },
+    { currency: 'USD', buyRate: 4000, sellRate: 4013, unit: 'KHR' },
+    { currency: 'AUD', buyRate: 0.6728, sellRate: 0.6937, unit: 'USD' },
+    { currency: 'EUR', buyRate: 1.1353, sellRate: 1.1595, unit: 'USD' },
+    { currency: 'GBP', buyRate: 1.3122, sellRate: 1.3354, unit: 'USD' },
+    { currency: 'NZD', buyRate: 0.5624, sellRate: 0.5799, unit: 'USD' },
+    { currency: 'CAD', buyRate: 1.3769, sellRate: 1.4095, unit: 'USD' },
+    { currency: 'CHF', buyRate: 0.7807, sellRate: 0.8544, unit: 'USD' },
+    { currency: 'CNY', buyRate: 6.8661, sellRate: 7.0238, unit: 'USD' },
+    { currency: 'HKD', buyRate: 7.7810, sellRate: 8.0763, unit: 'USD' },
+    { currency: 'JPY', buyRate: 158.63, sellRate: 163.03, unit: 'USD' },
+    { currency: 'MYR', buyRate: 3.7355, sellRate: 4.3180, unit: 'USD' },
+    { currency: 'SGD', buyRate: 1.2787, sellRate: 1.2993, unit: 'USD' },
+    { currency: 'THB', buyRate: 32.70, sellRate: 33.49, unit: 'USD' },
+    { currency: 'TWD', buyRate: 29.49, sellRate: 34.99, unit: 'USD' },
+    { currency: 'KRW', buyRate: 1360.26, sellRate: 1715.44, unit: 'USD' },
+    { currency: 'VND', buyRate: 23070.66, sellRate: 29925.94, unit: 'USD' },
+    { currency: 'IDR', buyRate: 14751.16, sellRate: 19255.40, unit: 'USD' },
   ],
 };
 
