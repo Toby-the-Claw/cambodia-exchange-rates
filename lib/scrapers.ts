@@ -68,11 +68,21 @@ async function runPythonScraper(scriptName: string): Promise<BankRates | null> {
 
 // National Bank of Cambodia Official Rate
 export async function fetchNBCRate(): Promise<BankRates> {
+  // Check if running on Vercel - skip SSL issues
+  const isVercel = process.env.VERCEL === '1' || process.env.VERCEL_ENV !== undefined;
+  
+  // Try Python Selenium scraper first (local only)
+  if (!isVercel) {
+    console.log('Trying Python scraper for NBC...');
+    const pythonResult = await runPythonScraper('scrape_nbc.py');
+    if (pythonResult && pythonResult.rates.length > 0) {
+      console.log('✓ NBC Python scraper succeeded');
+      return pythonResult;
+    }
+  }
+  
+  // Try API with SSL bypass on Vercel
   try {
-    // NBC publishes daily rate on their website and via data.mef.gov.kh API
-    // On Vercel, we skip SSL verification due to CA certificate issues
-    const isVercel = process.env.VERCEL === '1' || process.env.VERCEL_ENV !== undefined;
-    
     const response = await axios.get('https://data.mef.gov.kh/api/v1/public-datasets/pd_66a0cd503e0bd300012638fb4/json?page=1&size=1', {
       timeout: 10000,
       ...(isVercel && { httpsAgent: new (require('https').Agent)({ rejectUnauthorized: false }) }),
@@ -95,35 +105,11 @@ export async function fetchNBCRate(): Promise<BankRates> {
       };
     }
   } catch (error) {
-    console.error('NBC fetch error:', error);
+    console.error('NBC API fetch error:', error);
   }
   
-  // Fallback to GDT website scraping
-  try {
-    const response = await axios.get('https://www.tax.gov.kh/en/exchange-rate', {
-      timeout: 10000,
-    });
-    const $ = cheerio.load(response.data);
-    
-    // Extract latest rate from the table/list
-    const rateText = $('.exchange-rate-value, .rate-value').first().text() || '4000';
-    const rate = parseFloat(rateText.replace(/,/g, '')) || 4000;
-    
-    return {
-      bankName: 'National Bank of Cambodia',
-      bankCode: 'NBC',
-      updatedAt: new Date().toISOString(),
-      rates: [{
-        currency: 'USD',
-        buyRate: rate,
-        sellRate: rate + 10,
-        unit: 'KHR',
-      }],
-    };
-  } catch (error) {
-    console.error('NBC fallback error:', error);
-  }
-  
+  // Fallback to hardcoded official rate
+  console.log('Using hardcoded NBC official rate');
   return {
     bankName: 'National Bank of Cambodia',
     bankCode: 'NBC',

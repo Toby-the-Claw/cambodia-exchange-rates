@@ -1,0 +1,13 @@
+{
+  "bankName": "National Bank of Cambodia",
+  "bankCode": "NBC",
+  "updatedAt": "2026-03-30T14:20:38.116731",
+  "rates": [
+    {
+      "currency": "USD",
+      "buyRate": 4000,
+      "sellRate": 4010,
+      "unit": "KHR"
+    }
+  ]
+}
