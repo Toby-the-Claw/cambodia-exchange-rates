@@ -1,283 +1,221 @@
 #!/usr/bin/env python3
 """
-Cambodia Exchange Rates Scraper
-Handles Cloudflare-protected sites (ABA, Wing) using various techniques
+ABA Bank Exchange Rates Scraper
+Uses curl_cffi to mimic browser TLS fingerprint (bypasses Cloudflare)
+No external API required
 """
 
-import requests
 import json
+import re
 import sys
 from datetime import datetime
-from typing import Dict, List, Optional
+from typing import Dict, List
 
-# Try to import optional dependencies
+# Try curl_cffi (best for bypassing Cloudflare)
 try:
-    import cloudscraper
-    CLOUDSCRAPER_AVAILABLE = True
+    from curl_cffi import requests
+    CURL_CFFI_AVAILABLE = True
 except ImportError:
-    CLOUDSCRAPER_AVAILABLE = False
-
-try:
-    from playwright.sync_api import sync_playwright
-    PLAYWRIGHT_AVAILABLE = True
-except ImportError:
-    PLAYWRIGHT_AVAILABLE = False
+    CURL_CFFI_AVAILABLE = False
 
 
-class CambodiaRateScraper:
-    """Scraper for Cambodian bank exchange rates"""
-    
-    def __init__(self):
-        self.results = {}
+def scrape_aba_curl_cffi() -> Dict:
+    """
+    Scrape ABA using curl_cffi (impersonates browser TLS/JA3 fingerprint)
+    This bypasses Cloudflare without external APIs
+    """
+    if not CURL_CFFI_AVAILABLE:
+        print("❌ curl_cffi not available")
+        return None
         
-    def get_headers(self) -> Dict[str, str]:
-        """Get realistic browser headers"""
-        return {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-            'Accept-Language': 'en-US,en;q=0.9,km;q=0.8',
-            'Accept-Encoding': 'gzip, deflate, br',
-            'Referer': 'https://www.google.com/',
-            'DNT': '1',
-            'Connection': 'keep-alive',
-            'Upgrade-Insecure-Requests': '1',
-            'Sec-Fetch-Dest': 'document',
-            'Sec-Fetch-Mode': 'navigate',
-            'Sec-Fetch-Site': 'none',
-            'Sec-Fetch-User': '?1',
-            'Cache-Control': 'max-age=0',
-        }
+    url = 'https://www.ababank.com/en/forex-exchange/'
     
-    def scrape_aba_cloudscraper(self) -> Optional[Dict]:
-        """Scrape ABA using cloudscraper (bypasses Cloudflare)"""
-        if not CLOUDSCRAPER_AVAILABLE:
-            return None
-            
-        try:
-            scraper = cloudscraper.create_scraper(
-                browser={
-                    'browser': 'chrome',
-                    'platform': 'windows',
-                    'desktop': True
-                }
-            )
-            
-            response = scraper.get(
-                'https://www.ababank.com/en/forex-exchange/',
-                headers=self.get_headers(),
-                timeout=30
-            )
-            
-            if response.status_code == 200:
-                return self.parse_aba_html(response.text)
+    print("Using curl_cffi (impersonates Chrome browser)...")
+    
+    try:
+        # Use impersonate to mimic real Chrome browser
+        response = requests.get(
+            url,
+            impersonate="chrome120",
+            timeout=30
+        )
+        
+        print(f"Status: {response.status_code}")
+        
+        if response.status_code == 200:
+            # Check if we got actual content or challenge page
+            if len(response.text) > 10000 and 'USD' in response.text:
+                print("✓ Successfully fetched page content")
+                return parse_aba_html(response.text)
             else:
-                print(f"ABA cloudscraper failed: HTTP {response.status_code}")
+                print("⚠️  Got challenge page or insufficient content")
                 return None
-                
-        except Exception as e:
-            print(f"ABA cloudscraper error: {e}")
-            return None
-    
-    def scrape_aba_playwright(self) -> Optional[Dict]:
-        """Scrape ABA using Playwright (headless browser)"""
-        if not PLAYWRIGHT_AVAILABLE:
+        else:
+            print(f"❌ HTTP {response.status_code}")
             return None
             
-        try:
-            with sync_playwright() as p:
-                browser = p.chromium.launch(
-                    headless=True,
-                    args=['--no-sandbox', '--disable-setuid-sandbox']
-                )
-                
-                context = browser.new_context(
-                    user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                    viewport={'width': 1920, 'height': 1080},
-                    locale='en-US',
-                )
-                
-                page = context.new_page()
-                
-                # Set extra headers
-                page.set_extra_http_headers({
-                    'Accept-Language': 'en-US,en;q=0.9',
-                    'Referer': 'https://www.google.com/',
-                })
-                
-                # Navigate and wait for content
-                page.goto('https://www.ababank.com/en/forex-exchange/', wait_until='networkidle')
-                
-                # Wait for rate table to load
-                page.wait_for_selector('table', timeout=10000)
-                
-                # Get HTML content
-                html = page.content()
-                
-                browser.close()
-                
-                return self.parse_aba_html(html)
-                
-        except Exception as e:
-            print(f"ABA playwright error: {e}")
-            return None
-    
-    def scrape_aba_requests(self) -> Optional[Dict]:
-        """Scrape ABA using requests with session (basic attempt)"""
-        try:
-            session = requests.Session()
-            session.headers.update(self.get_headers())
-            
-            response = session.get(
-                'https://www.ababank.com/en/forex-exchange/',
-                timeout=15
-            )
-            
-            if response.status_code == 200 and 'cloudflare' not in response.text.lower():
-                return self.parse_aba_html(response.text)
-            else:
-                print(f"ABA requests blocked or returned challenge page")
-                return None
-                
-        except Exception as e:
-            print(f"ABA requests error: {e}")
-            return None
-    
-    def parse_aba_html(self, html: str) -> Dict:
-        """Parse ABA HTML to extract rates"""
-        from bs4 import BeautifulSoup
+    except Exception as e:
+        print(f"❌ Error: {e}")
+        return None
+
+
+def scrape_aba_cloudscraper() -> Dict:
+    """Fallback to cloudscraper"""
+    try:
+        import cloudscraper
         
-        soup = BeautifulSoup(html, 'html.parser')
-        rates = []
+        url = 'https://www.ababank.com/en/forex-exchange/'
         
-        # Find rate tables
-        tables = soup.find_all('table')
+        print("Using cloudscraper...")
         
-        for table in tables:
-            rows = table.find_all('tr')
-            for i, row in enumerate(rows):
-                if i == 0:  # Skip header
-                    continue
-                    
-                cols = row.find_all('td')
-                if len(cols) >= 3:
-                    currency_text = cols[0].get_text(strip=True)
-                    buy_text = cols[1].get_text(strip=True).replace(',', '')
-                    sell_text = cols[2].get_text(strip=True).replace(',', '')
-                    
-                    # Parse currency pair
-                    import re
-                    match = re.search(r'([A-Z]{3})\s*/\s*([A-Z]{3})', currency_text)
-                    if match:
-                        base, quote = match.groups()
-                        try:
-                            buy_rate = float(buy_text)
-                            sell_rate = float(sell_text)
-                            
-                            if buy_rate > 0 and sell_rate > 0:
-                                rates.append({
-                                    'currency': base,
-                                    'buyRate': buy_rate,
-                                    'sellRate': sell_rate,
-                                    'unit': quote
-                                })
-                        except ValueError:
-                            continue
+        scraper = cloudscraper.create_scraper(
+            browser={
+                'browser': 'chrome',
+                'platform': 'windows',
+                'desktop': True
+            },
+            delay=10
+        )
         
-        # Extract update time
-        update_text = soup.get_text()
-        updated_at = datetime.now().isoformat()
-        
-        return {
-            'bankName': 'ABA Bank',
-            'bankCode': 'ABA',
-            'updatedAt': updated_at,
-            'rates': rates
+        headers = {
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.9',
         }
+        
+        response = scraper.get(url, headers=headers, timeout=30)
+        
+        print(f"Status: {response.status_code}")
+        
+        if response.status_code == 200 and 'USD' in response.text:
+            return parse_aba_html(response.text)
+        return None
+        
+    except Exception as e:
+        print(f"Cloudscraper error: {e}")
+        return None
+
+
+def parse_aba_html(html: str) -> Dict:
+    """Parse ABA Bank HTML to extract exchange rates"""
+    from bs4 import BeautifulSoup
     
-    def scrape_aba(self) -> Dict:
-        """Scrape ABA with fallback methods"""
-        print("Attempting to scrape ABA Bank...")
-        
-        # Try cloudscraper first
-        if CLOUDSCRAPER_AVAILABLE:
-            print("  Trying cloudscraper...")
-            result = self.scrape_aba_cloudscraper()
-            if result and result['rates']:
-                print(f"  ✓ Cloudscraper success: {len(result['rates'])} rates")
-                return result
-        
-        # Try playwright second
-        if PLAYWRIGHT_AVAILABLE:
-            print("  Trying playwright...")
-            result = self.scrape_aba_playwright()
-            if result and result['rates']:
-                print(f"  ✓ Playwright success: {len(result['rates'])} rates")
-                return result
-        
-        # Try basic requests last
-        print("  Trying basic requests...")
-        result = self.scrape_aba_requests()
-        if result and result['rates']:
-            print(f"  ✓ Requests success: {len(result['rates'])} rates")
-            return result
-        
-        # All methods failed - return empty
-        print("  ✗ All methods failed, returning empty")
-        return {
+    soup = BeautifulSoup(html, 'html.parser')
+    rates = []
+    
+    # Find all tables
+    tables = soup.find_all('table')
+    
+    for table in tables:
+        rows = table.find_all('tr')
+        for i, row in enumerate(rows):
+            if i == 0:
+                continue
+                
+            cols = row.find_all(['td', 'th'])
+            if len(cols) >= 3:
+                currency_text = cols[0].get_text(strip=True)
+                buy_text = cols[1].get_text(strip=True).replace(',', '').replace(' ', '')
+                sell_text = cols[2].get_text(strip=True).replace(',', '').replace(' ', '')
+                
+                match = re.search(r'([A-Z]{3})\s*/\s*([A-Z]{3})', currency_text)
+                if match:
+                    base, quote = match.groups()
+                    try:
+                        buy_rate = float(buy_text)
+                        sell_rate = float(sell_text)
+                        
+                        if buy_rate > 0 and sell_rate > 0:
+                            rates.append({
+                                'currency': base,
+                                'buyRate': buy_rate,
+                                'sellRate': sell_rate,
+                                'unit': quote
+                            })
+                    except ValueError:
+                        continue
+    
+    # Extract update time
+    updated_at = datetime.now().isoformat()
+    page_text = soup.get_text()
+    
+    date_match = re.search(r'Upload Date\s*:\s*([^\n]+)', page_text, re.IGNORECASE)
+    if date_match:
+        try:
+            date_str = date_match.group(1).strip()
+            parsed_date = datetime.strptime(date_str, '%B %d, %Y %H:%M')
+            updated_at = parsed_date.isoformat()
+        except:
+            pass
+    
+    return {
+        'bankName': 'ABA Bank',
+        'bankCode': 'ABA',
+        'updatedAt': updated_at,
+        'rates': rates
+    }
+
+
+def main():
+    """Main entry point"""
+    print("=" * 60)
+    print("ABA Bank Exchange Rate Scraper")
+    print("No external API required")
+    print("=" * 60)
+    print()
+    
+    # Try curl_cffi first (best option)
+    result = None
+    
+    if CURL_CFFI_AVAILABLE:
+        result = scrape_aba_curl_cffi()
+    else:
+        print("curl_cffi not installed. Install with:")
+        print("  pip3 install curl_cffi")
+        print()
+    
+    # Fallback to cloudscraper
+    if not result or not result.get('rates'):
+        result = scrape_aba_cloudscraper()
+    
+    # If all failed, return empty
+    if not result:
+        result = {
             'bankName': 'ABA Bank',
             'bankCode': 'ABA',
             'updatedAt': datetime.now().isoformat(),
             'rates': []
         }
     
-    def scrape_all(self) -> List[Dict]:
-        """Scrape all banks"""
-        results = []
-        
-        # ABA Bank
-        aba = self.scrape_aba()
-        results.append(aba)
-        
-        # Add other banks here as needed
-        
-        return results
-
-
-def main():
-    """Main entry point"""
-    scraper = CambodiaRateScraper()
-    
-    print("=" * 50)
-    print("Cambodia Exchange Rates Scraper")
-    print("=" * 50)
+    # Display results
     print()
-    
-    # Check available methods
-    print(f"Cloudscraper available: {CLOUDSCRAPER_AVAILABLE}")
-    print(f"Playwright available: {PLAYWRIGHT_AVAILABLE}")
-    print()
-    
-    # Scrape ABA
-    result = scraper.scrape_aba()
-    
-    print()
-    print("=" * 50)
-    print(f"Bank: {result['bankName']}")
+    print("=" * 60)
+    print(f"Results: {result['bankName']}")
+    print(f"Updated: {result['updatedAt']}")
     print(f"Rates found: {len(result['rates'])}")
-    print("=" * 50)
+    print("=" * 60)
     
     if result['rates']:
-        for rate in result['rates'][:5]:  # Show first 5
-            print(f"  {rate['currency']}/{rate['unit']}: {rate['buyRate']} / {rate['sellRate']}")
+        for rate in result['rates']:
+            print(f"  {rate['currency']}/{rate['unit']:<3}  Buy: {rate['buyRate']:<10}  Sell: {rate['sellRate']}")
     else:
-        print("  No rates found - site may be blocking scrapers")
+        print("  No rates found")
+        print()
+        print("Note: ABA Bank has strong anti-bot protection.")
+        print("Recommendations:")
+        print("  1. Install curl_cffi: pip3 install curl_cffi")
+        print("  2. Use a residential proxy")
+        print("  3. Use ScrapingAnt/ScrapingBee API")
     
-    # Save to file
+    # Save to JSON
     output_file = 'aba_rates.json'
     with open(output_file, 'w') as f:
         json.dump(result, f, indent=2)
-    print(f"\nSaved to {output_file}")
+    print()
+    print(f"Saved to: {output_file}")
+    
+    return result
 
 
 if __name__ == '__main__':
-    main()
+    result = main()
+    sys.exit(0 if result['rates'] else 1)

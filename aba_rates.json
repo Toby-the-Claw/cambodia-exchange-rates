@@ -1,0 +1,271 @@
+{
+  "bankName": "ABA Bank",
+  "bankCode": "ABA",
+  "updatedAt": "2026-03-30T13:46:18.980563",
+  "rates": [
+    {
+      "currency": "USD",
+      "buyRate": 4000.0,
+      "sellRate": 4015.0,
+      "unit": "KHR"
+    },
+    {
+      "currency": "AUD",
+      "buyRate": 2700.34,
+      "sellRate": 2782.54,
+      "unit": "KHR"
+    },
+    {
+      "currency": "CAD",
+      "buyRate": 2850.87,
+      "sellRate": 2908.46,
+      "unit": "KHR"
+    },
+    {
+      "currency": "CNY",
+      "buyRate": 574.12,
+      "sellRate": 582.21,
+      "unit": "KHR"
+    },
+    {
+      "currency": "EUR",
+      "buyRate": 4556.95,
+      "sellRate": 4639.74,
+      "unit": "KHR"
+    },
+    {
+      "currency": "GBP",
+      "buyRate": 5263.89,
+      "sellRate": 5338.03,
+      "unit": "KHR"
+    },
+    {
+      "currency": "JPY",
+      "buyRate": 24.8969,
+      "sellRate": 25.2235,
+      "unit": "KHR"
+    },
+    {
+      "currency": "KRW",
+      "buyRate": 2.5962,
+      "sellRate": 2.7054,
+      "unit": "KHR"
+    },
+    {
+      "currency": "SGD",
+      "buyRate": 3090.79,
+      "sellRate": 3125.03,
+      "unit": "KHR"
+    },
+    {
+      "currency": "THB",
+      "buyRate": 120.65,
+      "sellRate": 122.36,
+      "unit": "KHR"
+    },
+    {
+      "currency": "VND",
+      "buyRate": 0.1496,
+      "sellRate": 0.154,
+      "unit": "KHR"
+    },
+    {
+      "currency": "AUD",
+      "buyRate": 0.672563,
+      "sellRate": 0.695635,
+      "unit": "USD"
+    },
+    {
+      "currency": "EUR",
+      "buyRate": 1.134981,
+      "sellRate": 1.159935,
+      "unit": "USD"
+    },
+    {
+      "currency": "GBP",
+      "buyRate": 1.311056,
+      "sellRate": 1.334507,
+      "unit": "USD"
+    },
+    {
+      "currency": "USD",
+      "buyRate": 1.375298,
+      "sellRate": 1.408342,
+      "unit": "CAD"
+    },
+    {
+      "currency": "USD",
+      "buyRate": 6.870373,
+      "sellRate": 6.993312,
+      "unit": "CNY"
+    },
+    {
+      "currency": "USD",
+      "buyRate": 158.582274,
+      "sellRate": 161.265057,
+      "unit": "JPY"
+    },
+    {
+      "currency": "USD",
+      "buyRate": 1478.52,
+      "sellRate": 1546.49,
+      "unit": "KRW"
+    },
+    {
+      "currency": "USD",
+      "buyRate": 1.279987,
+      "sellRate": 1.299021,
+      "unit": "SGD"
+    },
+    {
+      "currency": "USD",
+      "buyRate": 32.690421,
+      "sellRate": 33.278077,
+      "unit": "THB"
+    },
+    {
+      "currency": "USD",
+      "buyRate": 25974.03,
+      "sellRate": 26838.24,
+      "unit": "VND"
+    },
+    {
+      "currency": "USD",
+      "buyRate": 4000.0,
+      "sellRate": 4015.0,
+      "unit": "KHR"
+    },
+    {
+      "currency": "AUD",
+      "buyRate": 2618.09,
+      "sellRate": 2793.02,
+      "unit": "KHR"
+    },
+    {
+      "currency": "CAD",
+      "buyRate": 2641.63,
+      "sellRate": 2919.37,
+      "unit": "KHR"
+    },
+    {
+      "currency": "CNY",
+      "buyRate": 530.93,
+      "sellRate": 584.39,
+      "unit": "KHR"
+    },
+    {
+      "currency": "EUR",
+      "buyRate": 4464.89,
+      "sellRate": 4657.2,
+      "unit": "KHR"
+    },
+    {
+      "currency": "GBP",
+      "buyRate": 5115.47,
+      "sellRate": 5358.12,
+      "unit": "KHR"
+    },
+    {
+      "currency": "HKD",
+      "buyRate": 464.3,
+      "sellRate": 517.82,
+      "unit": "KHR"
+    },
+    {
+      "currency": "JPY",
+      "buyRate": 23.5816,
+      "sellRate": 25.3181,
+      "unit": "KHR"
+    },
+    {
+      "currency": "MYR",
+      "buyRate": 905.36,
+      "sellRate": 1009.72,
+      "unit": "KHR"
+    },
+    {
+      "currency": "SGD",
+      "buyRate": 2955.39,
+      "sellRate": 3136.75,
+      "unit": "KHR"
+    },
+    {
+      "currency": "THB",
+      "buyRate": 117.27,
+      "sellRate": 123.06,
+      "unit": "KHR"
+    },
+    {
+      "currency": "VND",
+      "buyRate": 0.1381,
+      "sellRate": 0.154,
+      "unit": "KHR"
+    },
+    {
+      "currency": "AUD",
+      "buyRate": 0.652077,
+      "sellRate": 0.698255,
+      "unit": "USD"
+    },
+    {
+      "currency": "EUR",
+      "buyRate": 1.112052,
+      "sellRate": 1.1643,
+      "unit": "USD"
+    },
+    {
+      "currency": "GBP",
+      "buyRate": 1.27409,
+      "sellRate": 1.33953,
+      "unit": "USD"
+    },
+    {
+      "currency": "USD",
+      "buyRate": 1.370159,
+      "sellRate": 1.519895,
+      "unit": "CAD"
+    },
+    {
+      "currency": "USD",
+      "buyRate": 6.844744,
+      "sellRate": 7.562202,
+      "unit": "CNY"
+    },
+    {
+      "currency": "USD",
+      "buyRate": 7.724692,
+      "sellRate": 8.647426,
+      "unit": "HKD"
+    },
+    {
+      "currency": "USD",
+      "buyRate": 157.989739,
+      "sellRate": 170.259864,
+      "unit": "JPY"
+    },
+    {
+      "currency": "USD",
+      "buyRate": 3.961494,
+      "sellRate": 4.4347,
+      "unit": "MYR"
+    },
+    {
+      "currency": "USD",
+      "buyRate": 1.275205,
+      "sellRate": 1.358535,
+      "unit": "SGD"
+    },
+    {
+      "currency": "USD",
+      "buyRate": 32.504469,
+      "sellRate": 34.23723,
+      "unit": "THB"
+    },
+    {
+      "currency": "USD",
+      "buyRate": 25974.03,
+      "sellRate": 29073.14,
+      "unit": "VND"
+    }
+  ]
+}
